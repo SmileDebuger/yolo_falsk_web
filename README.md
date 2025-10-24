@@ -21,7 +21,6 @@ yolo_flask/
 ├── config.py           # 配置管理模块
 ├── detector.py         # YOLO检测服务类
 ├── utils_app.py        # 工具函数模块
-├── requirements.txt    # 项目依赖
 ├── logs/              # 日志文件目录
 ├── static/            # 静态文件
 │   └── images/        # 检测结果图片
