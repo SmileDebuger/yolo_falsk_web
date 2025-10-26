@@ -146,7 +146,9 @@ class FileManager:
             
             # 获取相对于结果目录的相对路径
             relative_path = result_path.relative_to(config.results_path)
-            return f"/{config.app.results_url_prefix}/{relative_path}"
+            # 确保使用正斜杠（适配Web URL，兼容Windows）
+            url_path = str(relative_path).replace('\\', '/')
+            return f"/{config.app.results_url_prefix}/{url_path}"
             
         except Exception as e:
             self.logger.error(f"获取结果URL失败: {e}")
@@ -154,34 +156,50 @@ class FileManager:
 
 
 def setup_logging():
-    """设置日志配置"""
+    """设置日志配置（防止重复初始化）"""
+    # 检查是否已经设置了日志处理器
+    root_logger = logging.getLogger()
+    if root_logger.handlers:
+        # 已经初始化，跳过
+        return
+    
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler(config.logs_path / 'app.log'),
+            logging.FileHandler(config.logs_path / 'app.log', encoding='utf-8'),
             logging.StreamHandler()
         ]
     )
 
 
-def validate_image_file(file) -> Tuple[bool, str]:
+def validate_image_file(file, max_size_mb: int = None) -> Tuple[bool, str]:
     """
-    验证图片文件
+    验证图片文件（增强版）
     
     Args:
         file: 文件对象
+        max_size_mb: 最大文件大小（MB），None则使用配置中的值
         
     Returns:
         (是否有效, 错误消息)
     """
-    file_manager = FileManager()
-    
     if not file or file.filename == '':
         return False, "请选择文件"
     
+    # 使用全局 file_manager 实例（避免重复创建）
     if not file_manager.validate_file_type(file.filename):
         return False, f"不支持的文件类型。支持的类型: {', '.join(config.app.allowed_extensions)}"
+    
+    # 验证文件大小（在内存中检查，避免保存后才发现超限）
+    max_size = (max_size_mb or config.app.max_upload_size_mb) * 1024 * 1024
+    file.seek(0, 2)  # 移动到文件末尾
+    file_size = file.tell()
+    file.seek(0)  # 重置文件指针
+    
+    if file_size > max_size:
+        size_mb = file_size / (1024 * 1024)
+        return False, f"文件过大 ({size_mb:.2f}MB)，最大允许 {max_size_mb or config.app.max_upload_size_mb}MB"
     
     return True, ""
 
@@ -195,7 +213,10 @@ def create_directories():
         config.uploads_path / 'images',
         config.uploads_path / 'videos',
         config.results_path / 'images',
-        config.results_path / 'videos'
+        config.results_path / 'videos',
+        # 添加原图展示目录
+        config.static_path / 'images',
+        config.static_path / 'images' / 'original'
     ]
     
     for directory in directories:

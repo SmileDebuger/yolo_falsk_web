@@ -345,71 +345,200 @@
     </div>
 
     <script>
-        // 图片模态框功能
+        // 图片模态框功能（简化版，防止错误）
         function openModal(type) {
-            const modal = document.getElementById('imageModal');
-            const modalImg = document.getElementById('modal-img');
-            
-            if (type === 'original') {
-                modalImg.src = document.getElementById('original-img').src;
-                modalImg.alt = '原始图像';
-            } else {
-                modalImg.src = document.getElementById('result-img').src;
-                modalImg.alt = '检测结果';
+            try {
+                var modal = document.getElementById('imageModal');
+                var modalImg = document.getElementById('modal-img');
+                
+                if (!modal || !modalImg) {
+                    return;
+                }
+                
+                var imgElement;
+                if (type === 'original') {
+                    imgElement = document.getElementById('original-img');
+                    modalImg.alt = '原始图像';
+                } else {
+                    imgElement = document.getElementById('result-img');
+                    modalImg.alt = '检测结果';
+                }
+                
+                if (!imgElement || !imgElement.src) {
+                    simpleAlert('⚠️ 图片加载中，请稍后重试', 'warning');
+                    return;
+                }
+                
+                modalImg.src = imgElement.src;
+                modal.style.display = 'block';
+                
+            } catch (error) {
+                simpleAlert('❌ 无法放大图片', 'error');
             }
-            
-            modal.style.display = 'block';
         }
 
         function closeModal() {
-            document.getElementById('imageModal').style.display = 'none';
+            try {
+                var modal = document.getElementById('imageModal');
+                if (modal) {
+                    modal.style.display = 'none';
+                }
+            } catch (error) {
+                // 静默失败
+            }
         }
 
         // 点击模态框外部关闭
         window.onclick = function(event) {
-            const modal = document.getElementById('imageModal');
-            if (event.target === modal) {
-                closeModal();
+            try {
+                var modal = document.getElementById('imageModal');
+                if (modal && event.target === modal) {
+                    closeModal();
+                }
+            } catch (error) {
+                // 静默失败
             }
         }
 
         // ESC键关闭模态框
         document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape') {
-                closeModal();
+            try {
+                if (event.key === 'Escape' || event.keyCode === 27) {
+                    closeModal();
+                }
+            } catch (error) {
+                // 静默失败
             }
         });
 
-        // 下载结果功能
+        // 下载结果功能（简化版，防止错误）
         function downloadResult() {
-            const resultImg = document.getElementById('result-img');
-            const link = document.createElement('a');
-            link.href = resultImg.src;
-            link.download = 'yolo_detection_result.jpg';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        // 分享结果功能
-        function shareResult() {
-            if (navigator.share) {
-                navigator.share({
-                    title: 'YOLOv5 目标检测结果',
-                    text: '查看我的AI目标检测结果！',
-                    url: window.location.href
-                }).catch(console.error);
-            } else {
-                // 复制链接到剪贴板
-                navigator.clipboard.writeText(window.location.href).then(() => {
-                    alert('链接已复制到剪贴板！');
-                }).catch(() => {
-                    alert('分享功能不可用，请手动复制页面链接。');
-                });
+            try {
+                var resultImg = document.getElementById('result-img');
+                
+                if (!resultImg || !resultImg.src) {
+                    simpleAlert('⚠️ 无法获取检测结果图片', 'warning');
+                    return;
+                }
+                
+                // 检查图片是否加载成功
+                if (resultImg.naturalWidth === 0) {
+                    simpleAlert('⚠️ 图片尚未加载完成，请稍后重试', 'warning');
+                    return;
+                }
+                
+                // 生成带时间戳的文件名
+                var now = new Date();
+                var timestamp = now.getFullYear() + '-' + 
+                               (now.getMonth() + 1) + '-' + 
+                               now.getDate() + '_' + 
+                               now.getHours() + '-' + 
+                               now.getMinutes() + '-' + 
+                               now.getSeconds();
+                var filename = 'yolo_detection_' + timestamp + '.jpg';
+                
+                // 创建下载链接
+                var link = document.createElement('a');
+                link.href = resultImg.src;
+                link.download = filename;
+                link.style.display = 'none';
+                
+                document.body.appendChild(link);
+                link.click();
+                
+                // 延迟删除，确保下载完成
+                setTimeout(function() {
+                    if (link.parentNode) {
+                        document.body.removeChild(link);
+                    }
+                }, 100);
+                
+                simpleAlert('✅ 开始下载检测结果', 'success');
+                
+            } catch (error) {
+                simpleAlert('❌ 下载失败，请右键点击图片保存', 'error');
             }
         }
 
-        // 图片加载错误处理
+        // 分享结果功能（修复版，分享首页链接）
+        function shareResult() {
+            // 获取网站首页URL（而不是当前结果页）
+            var protocol = window.location.protocol;
+            var host = window.location.host;
+            var homeUrl = protocol + '//' + host + '/';
+            
+            // 方法1: 尝试复制到剪贴板（传统方法）
+            var textarea = document.createElement('textarea');
+            textarea.value = homeUrl;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                var successful = document.execCommand('copy');
+                document.body.removeChild(textarea);
+                
+                if (successful) {
+                    // 显示成功消息
+                    simpleAlert('✅ 应用链接已复制到剪贴板！\n分享后他人可上传图片进行检测', 'success');
+                } else {
+                    // 如果失败，显示链接让用户手动复制
+                    simpleAlert('请复制链接分享: ' + homeUrl, 'info');
+                }
+            } catch (err) {
+                document.body.removeChild(textarea);
+                // 最终备用方案：提示用户
+                simpleAlert('请手动复制应用链接分享: ' + homeUrl, 'info');
+            }
+        }
+        
+        // 简单的消息提示函数
+        function simpleAlert(message, type) {
+            // 移除已存在的提示
+            var existing = document.getElementById('simple-alert');
+            if (existing) {
+                existing.parentNode.removeChild(existing);
+            }
+            
+            // 创建新提示
+            var alertDiv = document.createElement('div');
+            alertDiv.id = 'simple-alert';
+            alertDiv.textContent = message;
+            
+            // 根据类型设置颜色
+            var bgColor = '#4CAF50'; // 默认绿色（成功）
+            if (type === 'info') bgColor = '#2196F3';
+            if (type === 'warning') bgColor = '#FF9800';
+            if (type === 'error') bgColor = '#f44336';
+            
+            // 设置样式
+            alertDiv.style.position = 'fixed';
+            alertDiv.style.top = '20px';
+            alertDiv.style.left = '50%';
+            alertDiv.style.transform = 'translateX(-50%)';
+            alertDiv.style.backgroundColor = bgColor;
+            alertDiv.style.color = 'white';
+            alertDiv.style.padding = '15px 30px';
+            alertDiv.style.borderRadius = '8px';
+            alertDiv.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+            alertDiv.style.zIndex = '10000';
+            alertDiv.style.fontSize = '16px';
+            alertDiv.style.maxWidth = '80%';
+            alertDiv.style.textAlign = 'center';
+            
+            // 添加到页面
+            document.body.appendChild(alertDiv);
+            
+            // 3秒后移除
+            setTimeout(function() {
+                if (alertDiv.parentNode) {
+                    alertDiv.parentNode.removeChild(alertDiv);
+                }
+            }, 3000);
+        }
+
+        // 图片加载错误处理（简化版）
         document.getElementById('original-img').onerror = function() {
             this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuWbvueJh+WKoOi9veWksei0pTwvdGV4dD48L3N2Zz4=';
             this.alt = '原始图像加载失败';

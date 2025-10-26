@@ -5,6 +5,7 @@ YOLO检测服务模块
 import logging
 import platform
 import sys
+import gc
 from pathlib import Path
 from typing import Optional, Union
 import torch
@@ -92,10 +93,17 @@ class YOLODetector:
             save_dir.mkdir(parents=True, exist_ok=True)
             
             # 执行检测
-            return self._run_detection(source, save_dir, source_info)
+            result = self._run_detection(source, save_dir, source_info)
+            
+            # 清理GPU内存（如果使用GPU）
+            self._cleanup_memory()
+            
+            return result
             
         except Exception as e:
             self.logger.error(f"检测过程中发生错误: {e}")
+            # 发生错误时也要清理内存
+            self._cleanup_memory()
             return None
     
     def _analyze_source(self, source: str) -> dict:
@@ -247,6 +255,23 @@ class YOLODetector:
         t = tuple(x.t / seen * 1E3 for x in dt)
         LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
         LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}")
+    
+    def _cleanup_memory(self):
+        """
+        清理内存和GPU显存
+        防止长时间运行导致的内存泄漏
+        """
+        try:
+            # 清理Python垃圾回收
+            gc.collect()
+            
+            # 如果使用GPU，清理CUDA缓存
+            if torch.cuda.is_available() and self.device.type == 'cuda':
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+                self.logger.debug("GPU内存已清理")
+        except Exception as e:
+            self.logger.warning(f"内存清理时出现警告: {e}")
 
 
 # 全局检测器实例

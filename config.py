@@ -3,6 +3,7 @@
 集中管理应用配置和YOLO检测参数
 """
 import os
+import logging
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional, Tuple, Union
@@ -85,6 +86,9 @@ class Config:
         
         # 目录配置
         self.setup_directories()
+        
+        # 验证模型文件
+        self.check_model_file()
     
     def setup_directories(self):
         """设置必要的目录"""
@@ -121,6 +125,40 @@ class Config:
     def static_path(self) -> Path:
         """静态文件路径"""
         return self.static_dir
+    
+    def check_model_file(self):
+        """
+        检查YOLO模型文件是否存在
+        如果不存在，给出下载提示
+        """
+        logger = logging.getLogger(__name__)
+        model_path = Path(self.yolo.weights)
+        
+        # 如果是相对路径，转换为绝对路径
+        if not model_path.is_absolute():
+            model_path = self.ROOT / model_path
+        
+        if not model_path.exists():
+            logger.warning(f"⚠️  模型文件不存在: {model_path}")
+            logger.warning(f"📥 首次运行时，YOLOv5会自动下载模型文件")
+            logger.warning(f"💡 或手动下载: https://github.com/ultralytics/yolov5/releases/download/v7.0/{self.yolo.weights}")
+            logger.warning(f"📁 并放置到项目根目录")
+        else:
+            logger.info(f"✅ 模型文件已就绪: {model_path}")
+        
+        return model_path.exists()
+    
+    def get_model_path(self) -> Path:
+        """
+        获取模型文件的完整路径
+        
+        Returns:
+            模型文件路径
+        """
+        model_path = Path(self.yolo.weights)
+        if not model_path.is_absolute():
+            model_path = self.ROOT / model_path
+        return model_path
 
 
 # 全局配置实例
